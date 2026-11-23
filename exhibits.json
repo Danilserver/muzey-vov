@@ -1,0 +1,18 @@
+[
+    {
+        "title": "Тест",
+        "category": "Герои нашей семьи и края",
+        "description": "Тест",
+        "image": "museum_files\\LAhmChkgroB4b-NIvcGzdX4Ko_xLa5N3j6-PBzUnuxvOwFDeUJd1JboI65V0TG3YMNgJaek3QOtBXy9hidQ8nOla.jpg",
+        "video": null,
+        "audio": null
+    },
+    {
+        "title": "тест 2",
+        "category": "Герои нашей семьи и края",
+        "description": "тест 2",
+        "image": "museum_files\\o8LtUEOzDujaGfsj2DrAgkYVnqi0Ni8-D4tvVqtxwh2XHLC-YVEWEINDSkrsxiT0u5j0j6hQ9lkcQ7-5kS-yJpjK.jpg",
+        "video": null,
+        "audio": null
+    }
+]
