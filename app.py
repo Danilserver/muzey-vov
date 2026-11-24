@@ -2,9 +2,14 @@ import streamlit as st
 import os
 import json
 
-st.set_page_config(page_title="Виртуальный музей ВОВ г. Ачинск", page_icon="🎖️", layout="wide")
+st.set_page_config(
+    page_title="Виртуальный музей поискового отряда им. Ф.А. Колтыги",
+    page_icon="🎖️",
+    layout="wide"
+)
 
-# Пароль администратора
+# Данные для входа администратора
+ADMIN_LOGIN = "admin"
 ADMIN_PASSWORD = "1945"
 
 MEDIA_DIR = "museum_files"
@@ -32,27 +37,43 @@ def fix_path(path):
         return alt_path
     return None
 
+# Запоминаем состояние входа в сессии
+if "is_admin" not in st.session_state:
+    st.session_state["is_admin"] = False
+
 # Боковая панель для входа администратора
 with st.sidebar:
-    st.header("🔐 Вход для хранителя музея")
-    password_input = st.text_input("Пароль администратора", type="password")
-    is_admin = (password_input == ADMIN_PASSWORD)
-    if is_admin:
-        st.success("Режим администратора включен")
-    elif password_input:
-        st.error("Неверный пароль")
+    st.header("🔐 Вход для администратора")
+    if not st.session_state["is_admin"]:
+        with st.form("login_form"):
+            login_input = st.text_input("Логин")
+            password_input = st.text_input("Пароль", type="password")
+            login_btn = st.form_submit_button("Войти")
+            if login_btn:
+                if login_input.strip() == ADMIN_LOGIN and password_input.strip() == ADMIN_PASSWORD:
+                    st.session_state["is_admin"] = True
+                    st.rerun()
+                else:
+                    st.error("Неверный логин или пароль")
+        st.caption("Режим посетителя: доступен просмотр экспозиции.")
     else:
-        st.info("Вы в режиме посетителя (только просмотр)")
+        st.success("✅ Вы вошли как администратор")
+        if st.button("🚪 Выйти"):
+            st.session_state["is_admin"] = False
+            st.rerun()
 
+is_admin = st.session_state["is_admin"]
 exhibits = load_data()
 
-st.title("🎖️ Виртуальный музей Великой Отечественной войны")
-st.markdown("**Проект по технологии: «Технологии прошлого – традиции будущего»** | Цифровой архив памяти")
+# Шапка музея
+st.title("🎖️ Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги")
+st.markdown("**Цифровой архив памяти и поисковых экспедиций** | г. Ачинск")
 
 CATEGORIES = [
     "Герои Советского Союза г. Ачинск",
     "Личные вещи солдат и офицеров РККА",
     "Вооружение",
+    "Находки поисковых экспедиций",
     "Фронтовые письма и документы",
     "Тыл — фронту"
 ]
@@ -70,14 +91,14 @@ def show_museum():
     else:
         for orig_idx, item in reversed(filtered_exhibits):
             with st.container(border=True):
-                col1, col2 = st.columns([1, 2])
+                col1, col2 = st.columns(2)
                 with col1:
                     img_path = fix_path(item.get("image"))
                     vid_path = fix_path(item.get("video"))
                     if img_path:
                         st.image(img_path, use_container_width=True)
                     else:
-                        st.info("🖼️ Портрет / фото пока не загружено")
+                        st.info("🖼️ Фотография / портрет не загружены")
                     if vid_path:
                         st.video(vid_path)
                 with col2:
@@ -89,37 +110,49 @@ def show_museum():
                         st.markdown("**🎧 Аудиоэкскурсия:**")
                         st.audio(aud_path)
                     
-                    # Панель редактирования ТОЛЬКО для администратора
+                    # Полное редактирование карточки ТОЛЬКО для администратора
                     if is_admin:
-                        with st.expander("✏️ Прикрепить фото / аудио / удалить карточку"):
-                            new_img = st.file_uploader("Загрузить фото (JPG, PNG)", type=["jpg", "jpeg", "png"], key=f"img_{orig_idx}")
-                            new_aud = st.file_uploader("Загрузить аудиогид (MP3, WAV)", type=["mp3", "wav"], key=f"aud_{orig_idx}")
-                            
-                            c_save, c_del = st.columns(2)
-                            with c_save:
-                                if st.button("💾 Сохранить файлы", key=f"save_{orig_idx}"):
-                                    updated = False
+                        with st.expander("✏️ Редактировать экспонат / прикрепить медиафайлы"):
+                            with st.form(f"edit_form_{orig_idx}"):
+                                new_title = st.text_input("Название / ФИО Героя", value=item["title"])
+                                cat_index = CATEGORIES.index(item["category"]) if item.get("category") in CATEGORIES else 0
+                                new_cat = st.selectbox("Зал музея", CATEGORIES, index=cat_index)
+                                new_desc = st.text_area("Описание, подвиг, награды", value=item["description"], height=150)
+                                
+                                new_img = st.file_uploader("Прикрепить / заменить фото (JPG, PNG)", type=["jpg", "jpeg", "png"])
+                                new_vid = st.file_uploader("Прикрепить / заменить видео (MP4)", type=["mp4", "mov"])
+                                new_aud = st.file_uploader("Прикрепить / заменить аудиогид (MP3, WAV)", type=["mp3", "wav"])
+                                
+                                save_changes = st.form_submit_button("💾 Сохранить изменения")
+                                if save_changes:
+                                    exhibits[orig_idx]["title"] = new_title
+                                    exhibits[orig_idx]["category"] = new_cat
+                                    exhibits[orig_idx]["description"] = new_desc
+                                    
                                     if new_img is not None:
                                         p = f"{MEDIA_DIR}/{new_img.name}"
                                         with open(p, "wb") as f:
                                             f.write(new_img.getbuffer())
                                         exhibits[orig_idx]["image"] = p
-                                        updated = True
+                                    if new_vid is not None:
+                                        p = f"{MEDIA_DIR}/{new_vid.name}"
+                                        with open(p, "wb") as f:
+                                            f.write(new_vid.getbuffer())
+                                        exhibits[orig_idx]["video"] = p
                                     if new_aud is not None:
                                         p = f"{MEDIA_DIR}/{new_aud.name}"
                                         with open(p, "wb") as f:
                                             f.write(new_aud.getbuffer())
                                         exhibits[orig_idx]["audio"] = p
-                                        updated = True
-                                    if updated:
-                                        save_data(exhibits)
-                                        st.success("Файлы прикреплены!")
-                                        st.rerun()
-                            with c_del:
-                                if st.button("🗑️ Удалить карточку", key=f"del_{orig_idx}"):
-                                    exhibits.pop(orig_idx)
+                                        
                                     save_data(exhibits)
+                                    st.success("Изменения сохранены!")
                                     st.rerun()
+                                    
+                        if st.button("🗑️ Удалить этот экспонат", key=f"del_{orig_idx}"):
+                            exhibits.pop(orig_idx)
+                            save_data(exhibits)
+                            st.rerun()
 
 if is_admin:
     tab1, tab2 = st.tabs(["🖼️ Залы музея", "➕ Добавить новый экспонат"])
@@ -162,3 +195,18 @@ if is_admin:
                     st.success(f"Экспонат «{title}» добавлен в зал «{category}»!")
 else:
     show_museum()
+
+# Нижний блок с информацией о поисковом отряде
+st.divider()
+with st.container(border=True):
+    st.subheader("🔎 О поисковом отряде имени Героя Советского Союза Ф.А. Колтыги")
+    st.write(
+        "Ачинский поисковый отряд имени Героя Советского Союза Фёдора Андреевича Колтыги создан в феврале 2023 года "
+        "и действует на базе МБОУ «Средняя школа № 11 имени Ф.А. Колтыги» города Ачинска. "
+        "Это единственное поисковое объединение Ачинского округа, которое ведёт работу по увековечению памяти погибших защитников Отечества."
+    )
+    st.write(
+        "В рамках Всероссийской акции «Вахта Памяти» бойцы отряда регулярно выезжают в полевые экспедиции на места кровопролитных боёв "
+        "Великой Отечественной войны в Новгородскую область (Демянский район). "
+       
+    )
