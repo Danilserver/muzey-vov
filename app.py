@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import json
+import pandas as pd
+from datetime import datetime
 
 st.set_page_config(
     page_title="Виртуальный музей поискового отряда им. Ф.А. Колтыги",
@@ -8,13 +10,91 @@ st.set_page_config(
     layout="wide"
 )
 
-# Данные для входа администратора
+# Данные администратора
 ADMIN_LOGIN = "admin"
 ADMIN_PASSWORD = "1945"
 
 MEDIA_DIR = "museum_files"
 DATA_FILE = "exhibits.json"
+STATS_FILE = "site_stats.json"
 os.makedirs(MEDIA_DIR, exist_ok=True)
+
+# --- Уникальный музейный дизайн (CSS) ---
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #F6F2E9;
+        color: #2B2118;
+    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    .museum-banner {
+        background: linear-gradient(135deg, #4A151B 0%, #2C0B0E 100%);
+        padding: 32px 28px;
+        border-radius: 12px;
+        border-bottom: 5px solid #C59B27;
+        color: #FDFBF7;
+        margin-bottom: 24px;
+        box-shadow: 0 6px 18px rgba(44, 11, 14, 0.25);
+    }
+    .museum-banner h1 {
+        color: #FDFBF7 !important;
+        font-family: 'Georgia', serif;
+        font-size: 2.1rem;
+        margin-bottom: 8px;
+        line-height: 1.25;
+    }
+    .museum-banner p {
+        color: #E8D8B5;
+        font-size: 1.05rem;
+        margin: 0;
+    }
+    
+    .stat-card {
+        background-color: #FFFDF9;
+        border: 1px solid #DFD3BC;
+        border-top: 4px solid #8B1E24;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .stat-num {
+        font-family: 'Georgia', serif;
+        font-size: 2rem;
+        font-weight: bold;
+        color: #8B1E24;
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        color: #5C4D3C;
+        margin-top: 4px;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFDF9 !important;
+        border: 1px solid #D8CBB3 !important;
+        border-left: 5px solid #C59B27 !important;
+        border-radius: 10px !important;
+        padding: 10px !important;
+        box-shadow: 0 4px 12px rgba(43, 33, 24, 0.06) !important;
+    }
+    
+    .stButton > button {
+        background-color: #7A1C21;
+        color: #FFFFFF;
+        border: 1px solid #C59B27;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    .stButton > button:hover {
+        background-color: #591216;
+        color: #F5E1A4;
+        border-color: #E5B93B;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -25,6 +105,16 @@ def load_data():
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+def load_stats():
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"candles": 142, "guestbook": []}
+
+def save_stats(stats):
+    with open(STATS_FILE, "w", encoding="utf-8") as f:
+        json.dump(stats, f, ensure_ascii=False, indent=4)
 
 def fix_path(path):
     if not path:
@@ -37,13 +127,27 @@ def fix_path(path):
         return alt_path
     return None
 
-# Запоминаем состояние входа в сессии
 if "is_admin" not in st.session_state:
     st.session_state["is_admin"] = False
+if "candle_lit" not in st.session_state:
+    st.session_state["candle_lit"] = False
 
-# Боковая панель для входа администратора
+stats = load_stats()
+
 with st.sidebar:
-    st.header("🔐 Вход для администратора")
+    st.markdown("### 🕯️ Акция «Свеча памяти»")
+    st.write(f"Зажжено свечей в память о героях-земляках: **{stats['candles']}**")
+    if not st.session_state["candle_lit"]:
+        if st.button("🕯️ Зажечь свечу памяти", use_container_width=True):
+            stats["candles"] += 1
+            save_stats(stats)
+            st.session_state["candle_lit"] = True
+            st.rerun()
+    else:
+        st.success("Ваша свеча памяти горит. Спасибо!")
+
+    st.divider()
+    st.markdown("### 🔐 Вход для администратора")
     if not st.session_state["is_admin"]:
         with st.form("login_form"):
             login_input = st.text_input("Логин")
@@ -65,9 +169,24 @@ with st.sidebar:
 is_admin = st.session_state["is_admin"]
 exhibits = load_data()
 
-# Шапка музея
-st.title("🎖️ Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги")
-st.markdown("**Цифровой архив памяти и поисковых экспедиций** | г. Ачинск")
+st.markdown("""
+<div class="museum-banner">
+    <h1>🎖️ Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги</h1>
+    <p>Цифровой архив памяти, находок полевых экспедиций и подвигов земляков • г. Ачинск, МБОУ «СШ № 11»</p>
+</div>
+""", unsafe_allow_html=True)
+
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.markdown('<div class="stat-card"><div class="stat-num">18</div><div class="stat-label">Героев Советского Союза г. Ачинск</div></div>', unsafe_allow_html=True)
+with c2:
+    st.markdown('<div class="stat-card"><div class="stat-num">97</div><div class="stat-label">Поднято и перезахоронено бойцов РККА</div></div>', unsafe_allow_html=True)
+with c3:
+    st.markdown('<div class="stat-card"><div class="stat-num">17</div><div class="stat-label">Найдено солдатских медальонов</div></div>', unsafe_allow_html=True)
+with c4:
+    st.markdown(f'<div class="stat-card"><div class="stat-num">{len(exhibits)}</div><div class="stat-label">Экспонатов в цифровом архиве</div></div>', unsafe_allow_html=True)
+
+st.write("")
 
 CATEGORIES = [
     "Герои Советского Союза г. Ачинск",
@@ -79,26 +198,39 @@ CATEGORIES = [
 ]
 
 def show_museum():
-    selected_cat = st.selectbox("Выберите зал для просмотра:", ["Все залы"] + CATEGORIES)
-    
-    filtered_exhibits = [
-        (idx, item) for idx, item in enumerate(exhibits)
-        if selected_cat == "Все залы" or item.get("category") == selected_cat
-    ]
+    col_filter, col_search = st.columns([1, 1.5])
+    with col_filter:
+        selected_cat = st.selectbox("🏛️ Выберите зал музея:", ["Все залы"] + CATEGORIES)
+    with col_search:
+        search_query = st.text_input("🔍 Поиск по фамилии, награде или событию:", placeholder="Например: Манкевич, Курская битва, За отвагу...")
+
+    filtered_exhibits = []
+    for idx, item in enumerate(exhibits):
+        cat_match = (selected_cat == "Все залы" or item.get("category") == selected_cat)
+        q = search_query.strip().lower()
+        text_match = (
+            not q
+            or q in item.get("title", "").lower()
+            or q in item.get("description", "").lower()
+        )
+        if cat_match and text_match:
+            filtered_exhibits.append((idx, item))
+
+    st.caption(f"Показано экспонатов: **{len(filtered_exhibits)}**")
 
     if not filtered_exhibits:
-        st.info("В этом зале пока нет экспонатов.")
+        st.info("По вашему запросу экспонатов не найдено. Попробуйте выбрать другой зал или изменить текст поиска.")
     else:
         for orig_idx, item in reversed(filtered_exhibits):
             with st.container(border=True):
-                col1, col2 = st.columns(2)
+                col1, col2 = st.columns([1, 1.4])
                 with col1:
                     img_path = fix_path(item.get("image"))
                     vid_path = fix_path(item.get("video"))
                     if img_path:
                         st.image(img_path, use_container_width=True)
                     else:
-                        st.info("🖼️ Фотография / портрет не загружены")
+                        st.info("🖼️ Фотография / портрет готовится к публикации")
                     if vid_path:
                         st.video(vid_path)
                 with col2:
@@ -110,7 +242,6 @@ def show_museum():
                         st.markdown("**🎧 Аудиоэкскурсия:**")
                         st.audio(aud_path)
                     
-                    # Полное редактирование карточки ТОЛЬКО для администратора
                     if is_admin:
                         with st.expander("✏️ Редактировать экспонат / прикрепить медиафайлы"):
                             with st.form(f"edit_form_{orig_idx}"):
@@ -155,10 +286,86 @@ def show_museum():
                             st.rerun()
 
 if is_admin:
-    tab1, tab2 = st.tabs(["🖼️ Залы музея", "➕ Добавить новый экспонат"])
-    with tab1:
-        show_museum()
-    with tab2:
+    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и Книга отзывов", "➕ Добавить экспонат"])
+else:
+    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и Книга отзывов"])
+
+with main_tabs[0]:
+    show_museum()
+
+with main_tabs[1]:
+    st.subheader("🗺️ География поисковых экспедиций отряда")
+    st.write("Бойцы Ачинского поискового отряда имени Героя Советского Союза Ф.А. Колтыги ежегодно выезжают из Красноярского края в Новгородскую область для участия во Всероссийской акции «Вахта Памяти».")
+    
+    map_data = pd.DataFrame({
+        "place": [
+            "г. Ачинск (База отряда, МБОУ СШ № 11 им. Ф.А. Колтыги)",
+            "Демянский район, Новгородская область (Место полевых экспедиций)",
+            "г. Боровичи, Новгородская область (Место поисковых работ)"
+        ],
+        "lat": [56.2694, 57.6431, 58.3878],
+        "lon": [90.4993, 32.4675, 33.9155]
+    })
+    st.map(map_data, zoom=3)
+    
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        with st.container(border=True):
+            st.markdown("**📍 г. Ачинск (Красноярский край)**")
+            st.write("Место формирования и базирования отряда на базе средней школы № 11. Здесь ведётся архивно-исследовательская работа, уроки мужества и хранение находок в школьном музее.")
+    with col_m2:
+        with st.container(border=True):
+            st.markdown("**📍 Демянский район и г. Боровичи (Новгородская область)**")
+            st.write("Места ожесточённых боёв Северо-Западного фронта (Демянский котёл). В ходе экспедиций здесь подняты останки 97 советских воинов и найдены 17 медальонов.")
+
+with main_tabs[2]:
+    with st.container(border=True):
+        st.subheader("🔎 О поисковом отряде имени Героя Советского Союза Ф.А. Колтыги")
+        st.write(
+            "Ачинский поисковый отряд имени Героя Советского Союза Фёдора Андреевича Колтыги создан в феврале 2023 года "
+            "и действует на базе МБОУ «Средняя школа № 11 имени Ф.А. Колтыги» города Ачинска. "
+            "Это единственное поисковое объединение Ачинского округа, которое ведёт работу по увековечению памяти погибших защитников Отечества."
+        )
+        st.write(
+            "В рамках Всероссийской акции «Вахта Памяти» бойцы отряда регулярно выезжают в полевые экспедиции на места кровопролитных боёв "
+            "Великой Отечественной войны в Новгородскую область. За время экспедиций поисковиками подняты и с воинскими почестями перезахоронены "
+            "останки 97 солдат и офицеров Красной Армии, а также обнаружены 17 солдатских медальонов, позволяющих вернуть имена павшим героям."
+        )
+        st.caption("«Война не окончена, пока не похоронен последний солдат»")
+
+    st.subheader("✍️ Книга отзывов и благодарностей")
+    with st.form("guestbook_form", clear_on_submit=True):
+        g_name = st.text_input("Ваше имя (например: Ученик 7 класса / Житель г. Ачинска)")
+        g_msg = st.text_area("Ваш отзыв или слова памяти")
+        if st.form_submit_button("Оставить запись в книге отзывов"):
+            if g_name.strip() and g_msg.strip():
+                stats["guestbook"].append({
+                    "name": g_name.strip(),
+                    "message": g_msg.strip(),
+                    "date": datetime.now().strftime("%d.%m.%Y")
+                })
+                save_stats(stats)
+                st.success("Спасибо! Ваша запись добавлена в Книгу отзывов музея.")
+                st.rerun()
+            else:
+                st.warning("Пожалуйста, заполните имя и текст сообщения.")
+
+    if not stats["guestbook"]:
+        st.info("В Книге отзывов пока нет записей. Станьте первым!")
+    else:
+        for idx_g, entry in enumerate(reversed(stats["guestbook"])):
+            with st.container(border=True):
+                st.markdown(f"**{entry['name']}** • *{entry['date']}*")
+                st.write(entry["message"])
+                if is_admin:
+                    real_idx = len(stats["guestbook"]) - 1 - idx_g
+                    if st.button("🗑️ Удалить отзыв", key=f"del_gb_{real_idx}"):
+                        stats["guestbook"].pop(real_idx)
+                        save_stats(stats)
+                        st.rerun()
+
+if is_admin:
+    with main_tabs[3]:
         st.subheader("Добавление нового экспоната в цифровой архив")
         with st.form("add_exhibit_form", clear_on_submit=True):
             title = st.text_input("Название экспоната *")
@@ -193,20 +400,3 @@ if is_admin:
                     exhibits.append(new_item)
                     save_data(exhibits)
                     st.success(f"Экспонат «{title}» добавлен в зал «{category}»!")
-else:
-    show_museum()
-
-# Нижний блок с информацией о поисковом отряде
-st.divider()
-with st.container(border=True):
-    st.subheader("🔎 О поисковом отряде имени Героя Советского Союза Ф.А. Колтыги")
-    st.write(
-        "Ачинский поисковый отряд имени Героя Советского Союза Фёдора Андреевича Колтыги создан в феврале 2023 года "
-        "и действует на базе МБОУ «Средняя школа № 11 имени Ф.А. Колтыги» города Ачинска. "
-        "Это единственное поисковое объединение Ачинского округа, которое ведёт работу по увековечению памяти погибших защитников Отечества."
-    )
-    st.write(
-        "В рамках Всероссийской акции «Вахта Памяти» бойцы отряда регулярно выезжают в полевые экспедиции на места кровопролитных боёв "
-        "Великой Отечественной войны в Новгородскую область (Демянский район). "
-       
-    )
