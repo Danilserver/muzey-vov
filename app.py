@@ -2,9 +2,9 @@ import streamlit as st
 import os
 import json
 
-st.set_page_config(page_title="Виртуальный музей ВОВ", page_icon="🎖️", layout="wide")
+st.set_page_config(page_title="Виртуальный музей ВОВ г. Ачинск", page_icon="🎖️", layout="wide")
 
-# Пароль администратора (можете заменить на свой внутри кавычек)
+# Пароль администратора
 ADMIN_PASSWORD = "1945"
 
 MEDIA_DIR = "museum_files"
@@ -50,14 +50,13 @@ st.title("🎖️ Виртуальный музей Великой Отечес�
 st.markdown("**Проект по технологии: «Технологии прошлого – традиции будущего»** | Цифровой архив памяти")
 
 CATEGORIES = [
-    "Герои нашей семьи и края",
+    "Герои Советского Союза г. Ачинск",
+    "Личные вещи солдат и офицеров РККА",
+    "Вооружение",
     "Фронтовые письма и документы",
-    "Награды и личные вещи солдат",
-    "Военная техника и связь",
     "Тыл — фронту"
 ]
 
-# Функция для отображения залов музея
 def show_museum():
     selected_cat = st.selectbox("Выберите зал для просмотра:", ["Все залы"] + CATEGORIES)
     
@@ -71,12 +70,14 @@ def show_museum():
     else:
         for orig_idx, item in reversed(filtered_exhibits):
             with st.container(border=True):
-                col1, col2 = st.columns(2)
+                col1, col2 = st.columns([1, 2])
                 with col1:
                     img_path = fix_path(item.get("image"))
                     vid_path = fix_path(item.get("video"))
                     if img_path:
                         st.image(img_path, use_container_width=True)
+                    else:
+                        st.info("🖼️ Портрет / фото пока не загружено")
                     if vid_path:
                         st.video(vid_path)
                 with col2:
@@ -88,16 +89,40 @@ def show_museum():
                         st.markdown("**🎧 Аудиоэкскурсия:**")
                         st.audio(aud_path)
                     
-                    # Кнопка удаления видна ТОЛЬКО администратору
+                    # Панель редактирования ТОЛЬКО для администратора
                     if is_admin:
-                        if st.button("🗑️ Удалить экспонат", key=f"del_{orig_idx}"):
-                            exhibits.pop(orig_idx)
-                            save_data(exhibits)
-                            st.rerun()
+                        with st.expander("✏️ Прикрепить фото / аудио / удалить карточку"):
+                            new_img = st.file_uploader("Загрузить фото (JPG, PNG)", type=["jpg", "jpeg", "png"], key=f"img_{orig_idx}")
+                            new_aud = st.file_uploader("Загрузить аудиогид (MP3, WAV)", type=["mp3", "wav"], key=f"aud_{orig_idx}")
+                            
+                            c_save, c_del = st.columns(2)
+                            with c_save:
+                                if st.button("💾 Сохранить файлы", key=f"save_{orig_idx}"):
+                                    updated = False
+                                    if new_img is not None:
+                                        p = f"{MEDIA_DIR}/{new_img.name}"
+                                        with open(p, "wb") as f:
+                                            f.write(new_img.getbuffer())
+                                        exhibits[orig_idx]["image"] = p
+                                        updated = True
+                                    if new_aud is not None:
+                                        p = f"{MEDIA_DIR}/{new_aud.name}"
+                                        with open(p, "wb") as f:
+                                            f.write(new_aud.getbuffer())
+                                        exhibits[orig_idx]["audio"] = p
+                                        updated = True
+                                    if updated:
+                                        save_data(exhibits)
+                                        st.success("Файлы прикреплены!")
+                                        st.rerun()
+                            with c_del:
+                                if st.button("🗑️ Удалить карточку", key=f"del_{orig_idx}"):
+                                    exhibits.pop(orig_idx)
+                                    save_data(exhibits)
+                                    st.rerun()
 
-# Разделение интерфейса: админ видит 2 вкладки, посетитель — только экспозицию
 if is_admin:
-    tab1, tab2 = st.tabs(["🖼️ Залы музея", "➕ Добавить экспонат"])
+    tab1, tab2 = st.tabs(["🖼️ Залы музея", "➕ Добавить новый экспонат"])
     with tab1:
         show_museum()
     with tab2:
