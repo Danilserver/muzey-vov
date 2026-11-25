@@ -20,7 +20,7 @@ DATA_FILE = "exhibits.json"
 STATS_FILE = "site_stats.json"
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
-# --- Уникальный музейный дизайн и полное скрытие панели разработчика ---
+# --- Компактный адаптивный музейный дизайн (CSS) ---
 st.markdown("""
 <style>
     /* Основной фон в стиле архивного пергамента */
@@ -29,32 +29,26 @@ st.markdown("""
         color: #2B2118;
     }
     
-    /* Полностью скрываем верхнюю техническую панель Streamlit, кнопки GitHub, Fork, Manage app и футер */
+    /* Скрываем лишние технические элементы Streamlit, но оставляем кнопку боковой панели */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
-    div[data-testid="stToolbar"] {
-        visibility: hidden !important;
-        display: none !important;
-    }
-    div[data-testid="stDecoration"] {
-        display: none !important;
-    }
-    div[data-testid="stStatusWidget"] {
-        display: none !important;
-    }
-    #MainMenu {
-        visibility: hidden !important;
-        display: none !important;
-    }
+    div[data-testid="stToolbar"],
+    div[data-testid="stDecoration"],
+    div[data-testid="stStatusWidget"],
+    #MainMenu,
     footer {
         visibility: hidden !important;
         display: none !important;
     }
     
-    /* Убираем лишний отступ сверху после скрытия шапки */
+    /* Ограничиваем максимальную ширину контента и делаем компактные отступы */
     .block-container {
-        padding-top: 1.5rem !important;
+        max-width: 1120px !important;
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
     }
 
     /* Оформление боковой панели */
@@ -63,59 +57,82 @@ st.markdown("""
         border-right: 1px solid #D8CBB3;
     }
 
-    /* Торжественная шапка музея */
+    /* Компактная адаптивная шапка музея */
     .museum-banner {
         background: linear-gradient(135deg, #4A151B 0%, #2C0B0E 100%);
-        padding: 36px 32px;
-        border-radius: 14px;
-        border-bottom: 5px solid #C59B27;
+        padding: 20px 24px;
+        border-radius: 12px;
+        border-bottom: 4px solid #C59B27;
         color: #FDFBF7;
-        margin-bottom: 24px;
-        box-shadow: 0 8px 24px rgba(44, 11, 14, 0.25);
+        margin-bottom: 14px;
+        box-shadow: 0 5px 15px rgba(44, 11, 14, 0.22);
     }
     .museum-banner h1 {
         color: #FDFBF7 !important;
         font-family: 'Georgia', serif;
-        font-size: 2.2rem;
-        margin-bottom: 10px;
-        line-height: 1.25;
+        font-size: clamp(1.25rem, 2.3vw, 1.75rem) !important;
+        margin-top: 0 !important;
+        margin-bottom: 6px !important;
+        line-height: 1.25 !important;
+        word-wrap: break-word;
     }
     .museum-banner p {
         color: #E8D8B5;
-        font-size: 1.05rem;
-        margin: 0;
+        font-size: clamp(0.85rem, 1.3vw, 0.98rem) !important;
+        margin: 0 !important;
+        line-height: 1.35 !important;
     }
     
-    /* Карточки статистики "Цифры памяти" */
+    /* Компактные карточки статистики "Цифры памяти" */
     .stat-card {
         background-color: #FFFDF9;
         border: 1px solid #DFD3BC;
-        border-top: 4px solid #8B1E24;
-        border-radius: 10px;
-        padding: 18px 14px;
+        border-top: 3px solid #8B1E24;
+        border-radius: 8px;
+        padding: 10px 8px;
         text-align: center;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        height: 100%;
     }
     .stat-num {
         font-family: 'Georgia', serif;
-        font-size: 2.1rem;
+        font-size: clamp(1.35rem, 2vw, 1.7rem);
         font-weight: bold;
         color: #8B1E24;
+        line-height: 1.15;
     }
     .stat-label {
-        font-size: 0.9rem;
+        font-size: clamp(0.76rem, 1.1vw, 0.85rem);
         color: #5C4D3C;
-        margin-top: 4px;
+        margin-top: 3px;
+        line-height: 1.2;
     }
 
-    /* Оформление витрин-экспонатов */
+    /* Компактные заголовки и текст внутри карточек */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFDF9 !important;
         border: 1px solid #D8CBB3 !important;
-        border-left: 5px solid #C59B27 !important;
-        border-radius: 10px !important;
-        padding: 12px !important;
-        box-shadow: 0 4px 12px rgba(43, 33, 24, 0.06) !important;
+        border-left: 4px solid #C59B27 !important;
+        border-radius: 9px !important;
+        padding: 10px 12px !important;
+        box-shadow: 0 3px 10px rgba(43, 33, 24, 0.05) !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] h3 {
+        font-size: clamp(1.05rem, 1.6vw, 1.28rem) !important;
+        line-height: 1.25 !important;
+        margin-bottom: 4px !important;
+        word-wrap: break-word;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] p {
+        font-size: 0.94rem !important;
+        line-height: 1.45 !important;
+    }
+
+    /* Адаптивные вкладки, чтобы названия не обрезались */
+    button[data-baseweb="tab"] {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        font-size: 0.9rem !important;
     }
     
     /* Кнопки в музейном стиле */
@@ -123,13 +140,31 @@ st.markdown("""
         background-color: #7A1C21;
         color: #FFFFFF;
         border: 1px solid #C59B27;
-        border-radius: 8px;
+        border-radius: 7px;
         font-weight: 500;
+        font-size: 0.9rem !important;
+        padding: 0.35rem 0.85rem !important;
     }
     .stButton > button:hover {
         background-color: #591216;
         color: #F5E1A4;
         border-color: #E5B93B;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 0.7rem !important;
+            padding-right: 0.7rem !important;
+            padding-top: 0.6rem !important;
+        }
+        .museum-banner {
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .stat-card {
+            padding: 8px 6px;
+            margin-bottom: 6px;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -169,15 +204,17 @@ if "is_admin" not in st.session_state:
     st.session_state["is_admin"] = False
 if "candle_lit" not in st.session_state:
     st.session_state["candle_lit"] = False
+if "show_login_box" not in st.session_state:
+    st.session_state["show_login_box"] = False
 
 stats = load_stats()
 
-# Боковая панель
+# Боковая панель (дублирующий вход + Свеча памяти)
 with st.sidebar:
     st.markdown("### 🕯️ Акция «Свеча памяти»")
     st.write(f"Зажжено свечей в память о героях-земляках: **{stats['candles']}**")
     if not st.session_state["candle_lit"]:
-        if st.button("🕯️ Зажечь свечу памяти", use_container_width=True):
+        if st.button("🕯️ Зажечь свечу памяти", key="sb_candle", use_container_width=True):
             stats["candles"] += 1
             save_stats(stats)
             st.session_state["candle_lit"] = True
@@ -186,29 +223,74 @@ with st.sidebar:
         st.success("Ваша свеча памяти горит. Спасибо!")
 
     st.divider()
-    st.markdown("### 🔐 Вход для администратора")
+    st.markdown("### 🔐 Кабинет хранителя")
     if not st.session_state["is_admin"]:
-        with st.form("login_form"):
+        with st.form("sidebar_login_form"):
             login_input = st.text_input("Логин")
             password_input = st.text_input("Пароль", type="password")
             login_btn = st.form_submit_button("Войти")
             if login_btn:
                 if login_input.strip() == ADMIN_LOGIN and password_input.strip() == ADMIN_PASSWORD:
                     st.session_state["is_admin"] = True
+                    st.session_state["show_login_box"] = False
                     st.rerun()
                 else:
                     st.error("Неверный логин или пароль")
-        st.caption("Режим посетителя: доступен просмотр экспозиции.")
     else:
-        st.success("✅ Вы вошли как администратор")
-        if st.button("🚪 Выйти"):
+        st.success("✅ Режим администратора")
+        if st.button("🚪 Выйти", key="sb_logout"):
             st.session_state["is_admin"] = False
             st.rerun()
 
 is_admin = st.session_state["is_admin"]
 exhibits = load_data()
 
-# Торжественная шапка музея
+# Верхняя панель быстрых действий прямо на главном экране (Свеча памяти + отдельная кнопка Вход)
+top_col1, top_col2, top_col3 = st.columns([2.2, 1.3, 1.1])
+with top_col1:
+    st.caption(f"🕯️ Акция «Свеча памяти» — зажжено свечей: **{stats['candles']}**")
+with top_col2:
+    if not st.session_state["candle_lit"]:
+        if st.button("🕯️ Зажечь свечу памяти", key="top_candle", use_container_width=True):
+            stats["candles"] += 1
+            save_stats(stats)
+            st.session_state["candle_lit"] = True
+            st.rerun()
+    else:
+        st.caption("✅ Ваша свеча горит")
+with top_col3:
+    if not is_admin:
+        if st.button("🔐 Вход для админа", key="top_login_toggle", use_container_width=True):
+            st.session_state["show_login_box"] = not st.session_state["show_login_box"]
+            st.rerun()
+    else:
+        if st.button("🚪 Выйти (Админ)", key="top_logout", use_container_width=True):
+            st.session_state["is_admin"] = False
+            st.rerun()
+
+# Выпадающее окно входа по нажатию на кнопку "Вход для админа"
+if st.session_state["show_login_box"] and not is_admin:
+    with st.container(border=True):
+        st.markdown("#### 🔐 Авторизация администратора музея")
+        with st.form("main_login_form"):
+            l_col1, l_col2, l_col3 = st.columns([1.5, 1.5, 1])
+            with l_col1:
+                m_login = st.text_input("Логин", placeholder="Введите логин")
+            with l_col2:
+                m_pass = st.text_input("Пароль", type="password", placeholder="Введите пароль")
+            with l_col3:
+                st.write("")
+                st.write("")
+                m_submit = st.form_submit_button("Войти", use_container_width=True)
+            if m_submit:
+                if m_login.strip() == ADMIN_LOGIN and m_pass.strip() == ADMIN_PASSWORD:
+                    st.session_state["is_admin"] = True
+                    st.session_state["show_login_box"] = False
+                    st.rerun()
+                else:
+                    st.error("Неверный логин или пароль!")
+
+# Компактная торжественная шапка музея
 st.markdown("""
 <div class="museum-banner">
     <h1>🎖️ Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги</h1>
@@ -216,7 +298,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Табло "Цифры памяти"
+# Компактное табло "Цифры памяти"
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.markdown('<div class="stat-card"><div class="stat-num">18</div><div class="stat-label">Героев Советского Союза г. Ачинск</div></div>', unsafe_allow_html=True)
@@ -239,7 +321,7 @@ CATEGORIES = [
 ]
 
 def show_museum():
-    col_filter, col_search = st.columns([1, 1.5])
+    col_filter, col_search = st.columns([1, 1.4])
     with col_filter:
         selected_cat = st.selectbox("🏛️ Выберите зал музея:", ["Все залы"] + CATEGORIES)
     with col_search:
@@ -264,7 +346,7 @@ def show_museum():
     else:
         for orig_idx, item in reversed(filtered_exhibits):
             with st.container(border=True):
-                col1, col2 = st.columns([1, 1.4])
+                col1, col2 = st.columns([1, 1.5])
                 with col1:
                     img_path = fix_path(item.get("image"))
                     vid_path = fix_path(item.get("video"))
@@ -289,7 +371,7 @@ def show_museum():
                                 new_title = st.text_input("Название / ФИО Героя", value=item["title"])
                                 cat_index = CATEGORIES.index(item["category"]) if item.get("category") in CATEGORIES else 0
                                 new_cat = st.selectbox("Зал музея", CATEGORIES, index=cat_index)
-                                new_desc = st.text_area("Описание, подвиг, награды", value=item["description"], height=150)
+                                new_desc = st.text_area("Описание, подвиг, награды", value=item["description"], height=130)
                                 
                                 new_img = st.file_uploader("Прикрепить / заменить фото (JPG, PNG)", type=["jpg", "jpeg", "png"])
                                 new_vid = st.file_uploader("Прикрепить / заменить видео (MP4)", type=["mp4", "mov"])
@@ -327,9 +409,9 @@ def show_museum():
                             st.rerun()
 
 if is_admin:
-    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и Книга отзывов", "➕ Добавить экспонат"])
+    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и отзывы", "➕ Добавить"])
 else:
-    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и Книга отзывов"])
+    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и отзывы"])
 
 with main_tabs[0]:
     show_museum()
