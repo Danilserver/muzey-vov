@@ -16,9 +16,13 @@ ADMIN_LOGIN = "admin"
 ADMIN_PASSWORD = "1945"
 
 MEDIA_DIR = "museum_files"
+ALBUM_DIR = "album_files"
 DATA_FILE = "exhibits.json"
+ALBUM_FILE = "album.json"
 STATS_FILE = "site_stats.json"
+
 os.makedirs(MEDIA_DIR, exist_ok=True)
+os.makedirs(ALBUM_DIR, exist_ok=True)
 
 # --- Компактный адаптивный музейный дизайн (CSS) ---
 st.markdown("""
@@ -29,7 +33,7 @@ st.markdown("""
         color: #2B2118;
     }
     
-    /* Скрываем лишние технические элементы Streamlit, но оставляем кнопку боковой панели */
+    /* Скрываем лишние технические элементы Streamlit */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
@@ -128,7 +132,7 @@ st.markdown("""
         line-height: 1.45 !important;
     }
 
-    /* Адаптивные вкладки, чтобы названия не обрезались */
+    /* Адаптивные вкладки */
     button[data-baseweb="tab"] {
         padding-left: 10px !important;
         padding-right: 10px !important;
@@ -169,33 +173,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+def load_json(file_path, default_val):
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
-    return []
+    return default_val
 
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+def save_json(file_path, data):
+    with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def load_stats():
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"candles": 142, "guestbook": []}
-
-def save_stats(stats):
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, ensure_ascii=False, indent=4)
-
-def fix_path(path):
+def fix_path(path, fallback_dir=MEDIA_DIR):
     if not path:
         return None
     clean_path = path.replace("\\", "/")
     if os.path.exists(clean_path):
         return clean_path
-    alt_path = os.path.join(MEDIA_DIR, os.path.basename(clean_path))
+    alt_path = os.path.join(fallback_dir, os.path.basename(clean_path))
     if os.path.exists(alt_path):
         return alt_path
     return None
@@ -207,16 +201,18 @@ if "candle_lit" not in st.session_state:
 if "show_login_box" not in st.session_state:
     st.session_state["show_login_box"] = False
 
-stats = load_stats()
+stats = load_json(STATS_FILE, {"candles": 142, "guestbook": []})
+exhibits = load_json(DATA_FILE, [])
+album_photos = load_json(ALBUM_FILE, [])
 
-# Боковая панель (дублирующий вход + Свеча памяти)
+# Боковая панель
 with st.sidebar:
     st.markdown("### 🕯️ Акция «Свеча памяти»")
     st.write(f"Зажжено свечей в память о героях-земляках: **{stats['candles']}**")
     if not st.session_state["candle_lit"]:
         if st.button("🕯️ Зажечь свечу памяти", key="sb_candle", use_container_width=True):
             stats["candles"] += 1
-            save_stats(stats)
+            save_json(STATS_FILE, stats)
             st.session_state["candle_lit"] = True
             st.rerun()
     else:
@@ -243,9 +239,8 @@ with st.sidebar:
             st.rerun()
 
 is_admin = st.session_state["is_admin"]
-exhibits = load_data()
 
-# Верхняя панель быстрых действий прямо на главном экране (Свеча памяти + отдельная кнопка Вход)
+# Верхняя панель быстрых действий прямо на главном экране
 top_col1, top_col2, top_col3 = st.columns([2.2, 1.3, 1.1])
 with top_col1:
     st.caption(f"🕯️ Акция «Свеча памяти» — зажжено свечей: **{stats['candles']}**")
@@ -253,7 +248,7 @@ with top_col2:
     if not st.session_state["candle_lit"]:
         if st.button("🕯️ Зажечь свечу памяти", key="top_candle", use_container_width=True):
             stats["candles"] += 1
-            save_stats(stats)
+            save_json(STATS_FILE, stats)
             st.session_state["candle_lit"] = True
             st.rerun()
     else:
@@ -268,7 +263,7 @@ with top_col3:
             st.session_state["is_admin"] = False
             st.rerun()
 
-# Выпадающее окно входа по нажатию на кнопку "Вход для админа"
+# Выпадающее окно входа
 if st.session_state["show_login_box"] and not is_admin:
     with st.container(border=True):
         st.markdown("#### 🔐 Авторизация администратора музея")
@@ -320,6 +315,13 @@ CATEGORIES = [
     "Тыл — фронту"
 ]
 
+ALBUM_ALBUMS = [
+    "Вахта Памяти (д. Цемена, Новгородская обл.)",
+    "Будни и сборы поискового отряда",
+    "Уроки мужества и работа в школьном музее",
+    "Торжественные мероприятия и перезахоронения"
+]
+
 def show_museum():
     col_filter, col_search = st.columns([1, 1.4])
     with col_filter:
@@ -348,8 +350,8 @@ def show_museum():
             with st.container(border=True):
                 col1, col2 = st.columns([1, 1.5])
                 with col1:
-                    img_path = fix_path(item.get("image"))
-                    vid_path = fix_path(item.get("video"))
+                    img_path = fix_path(item.get("image"), MEDIA_DIR)
+                    vid_path = fix_path(item.get("video"), MEDIA_DIR)
                     if img_path:
                         st.image(img_path, use_container_width=True)
                     else:
@@ -360,7 +362,7 @@ def show_museum():
                     st.subheader(item["title"])
                     st.caption(f"📍 Зал: {item['category']}")
                     st.write(item["description"])
-                    aud_path = fix_path(item.get("audio"))
+                    aud_path = fix_path(item.get("audio"), MEDIA_DIR)
                     if aud_path:
                         st.markdown("**🎧 Аудиоэкскурсия:**")
                         st.audio(aud_path)
@@ -399,24 +401,92 @@ def show_museum():
                                             f.write(new_aud.getbuffer())
                                         exhibits[orig_idx]["audio"] = p
                                         
-                                    save_data(exhibits)
+                                    save_json(DATA_FILE, exhibits)
                                     st.success("Изменения сохранены!")
                                     st.rerun()
                                     
                         if st.button("🗑️ Удалить этот экспонат", key=f"del_{orig_idx}"):
                             exhibits.pop(orig_idx)
-                            save_data(exhibits)
+                            save_json(DATA_FILE, exhibits)
                             st.rerun()
 
+def show_photo_album():
+    st.subheader("📸 Фотоальбом поискового отряда имени Ф.А. Колтыги")
+    st.write("Фотохроника полевых экспедиций «Вахта Памяти», тренировочных сборов, уроков мужества и работы бойцов отряда.")
+
+    # Если зашел админ — показываем форму массовой или одиночной загрузки фотографий в альбом
+    if is_admin:
+        with st.expander("➕ Загрузить фотографии в фотоальбом отряда", expanded=False):
+            with st.form("add_album_form", clear_on_submit=True):
+                alb_cat = st.selectbox("Выберите раздел альбома", ALBUM_ALBUMS)
+                alb_caption = st.text_input("Общая подпись или событие (например: Экспедиция в д. Цемена, май 2025)")
+                alb_date = st.text_input("Дата / год съемки", value=datetime.now().strftime("%Y г."))
+                uploaded_photos = st.file_uploader(
+                    "Выберите одну или сразу несколько фотографий (JPG, PNG)",
+                    type=["jpg", "jpeg", "png"],
+                    accept_multiple_files=True
+                )
+                if st.form_submit_button("📸 Опубликовать в фотоальбом"):
+                    if not uploaded_photos:
+                        st.error("Выберите хотя бы одну фотографию!")
+                    else:
+                        for photo_file in uploaded_photos:
+                            save_p = f"{ALBUM_DIR}/{photo_file.name}"
+                            with open(save_p, "wb") as f:
+                                f.write(photo_file.getbuffer())
+                            album_photos.append({
+                                "image": save_p,
+                                "album": alb_cat,
+                                "caption": alb_caption.strip() if alb_caption.strip() else "Фотоархив поискового отряда",
+                                "date": alb_date.strip()
+                            })
+                        save_json(ALBUM_FILE, album_photos)
+                        st.success(f"Загружено фотографий: {len(uploaded_photos)}!")
+                        st.rerun()
+
+    selected_album = st.selectbox("📂 Фильтр по разделам фотоальбома:", ["Все фотографии"] + ALBUM_ALBUMS)
+    
+    filtered_photos = [
+        (i, p) for i, p in enumerate(album_photos)
+        if selected_album == "Все фотографии" or p.get("album") == selected_album
+    ]
+
+    if not filtered_photos:
+        st.info("В этом разделе фотоальбома пока нет фотографий. Администратор отряда может загрузить снимки с экспедиций и мероприятий в личном кабинете.")
+    else:
+        st.caption(f"Фотографий в подборке: **{len(filtered_photos)}**")
+        # Выводим сеткой по 3 фотографии в ряд
+        reversed_photos = list(reversed(filtered_photos))
+        for row_start in range(0, len(reversed_photos), 3):
+            cols = st.columns(3)
+            for col_idx in range(3):
+                if row_start + col_idx < len(reversed_photos):
+                    orig_idx, photo = reversed_photos[row_start + col_idx]
+                    with cols[col_idx]:
+                        with st.container(border=True):
+                            p_path = fix_path(photo.get("image"), ALBUM_DIR)
+                            if p_path:
+                                st.image(p_path, use_container_width=True)
+                            st.markdown(f"**{photo.get('caption', '')}**")
+                            st.caption(f"📁 {photo.get('album', '')} • {photo.get('date', '')}")
+                            if is_admin:
+                                if st.button("🗑️ Удалить фото", key=f"del_alb_{orig_idx}", use_container_width=True):
+                                    album_photos.pop(orig_idx)
+                                    save_json(ALBUM_FILE, album_photos)
+                                    st.rerun()
+
 if is_admin:
-    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и отзывы", "➕ Добавить"])
+    main_tabs = st.tabs(["🖼️ Залы музея", "📸 Фотоальбом отряда", "🗺️ География Вахты Памяти", "📖 О нас и отзывы", "➕ Добавить экспонат"])
 else:
-    main_tabs = st.tabs(["🖼️ Залы музея", "🗺️ География Вахты Памяти", "📖 О нас и отзывы"])
+    main_tabs = st.tabs(["🖼️ Залы музея", "📸 Фотоальбом отряда", "🗺️ География Вахты Памяти", "📖 О нас и отзывы"])
 
 with main_tabs[0]:
     show_museum()
 
 with main_tabs[1]:
+    show_photo_album()
+
+with main_tabs[2]:
     st.subheader("🗺️ География поисковых экспедиций отряда")
     st.write("Бойцы Ачинского поискового отряда имени Героя Советского Союза Ф.А. Колтыги регулярно выезжают из Красноярского края в Новгородскую область для участия во Всероссийской акции «Вахта Памяти».")
     
@@ -468,7 +538,7 @@ with main_tabs[1]:
             "За время боёв на Демянской земле погибло более 148 тысяч советских воинов. Возвращение их имён из небытия — главная задача поискового отряда имени Героя Советского Союза Ф. А. Колтыги."
         )
 
-with main_tabs[2]:
+with main_tabs[3]:
     with st.container(border=True):
         st.subheader("🔎 О поисковом отряде имени Героя Советского Союза Ф.А. Колтыги")
         st.write(
@@ -494,7 +564,7 @@ with main_tabs[2]:
                     "message": g_msg.strip(),
                     "date": datetime.now().strftime("%d.%m.%Y")
                 })
-                save_stats(stats)
+                save_json(STATS_FILE, stats)
                 st.success("Спасибо! Ваша запись добавлена в Книгу отзывов музея.")
                 st.rerun()
             else:
@@ -511,11 +581,11 @@ with main_tabs[2]:
                     real_idx = len(stats["guestbook"]) - 1 - idx_g
                     if st.button("🗑️ Удалить отзыв", key=f"del_gb_{real_idx}"):
                         stats["guestbook"].pop(real_idx)
-                        save_stats(stats)
+                        save_json(STATS_FILE, stats)
                         st.rerun()
 
 if is_admin:
-    with main_tabs[3]:
+    with main_tabs[4]:
         st.subheader("Добавление нового экспоната в цифровой архив")
         with st.form("add_exhibit_form", clear_on_submit=True):
             title = st.text_input("Название экспоната *")
@@ -548,5 +618,5 @@ if is_admin:
                             new_item[key] = file_path
                     
                     exhibits.append(new_item)
-                    save_data(exhibits)
+                    save_json(DATA_FILE, exhibits)
                     st.success(f"Экспонат «{title}» добавлен в зал «{category}»!")
