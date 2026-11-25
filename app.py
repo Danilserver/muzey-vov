@@ -11,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Данные администратора
 ADMIN_LOGIN = "admin"
 ADMIN_PASSWORD = "1945"
 
@@ -26,16 +25,12 @@ os.makedirs(MEDIA_DIR, exist_ok=True)
 os.makedirs(ALBUM_DIR, exist_ok=True)
 os.makedirs(QUIZ_DIR, exist_ok=True)
 
-# --- Компактный адаптивный музейный дизайн (CSS) ---
 st.markdown("""
 <style>
-    /* Основной фон в стиле архивного пергамента */
     .stApp {
         background-color: #F6F2E9;
         color: #2B2118;
     }
-    
-    /* Скрываем лишние технические элементы Streamlit */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
@@ -47,8 +42,6 @@ st.markdown("""
         visibility: hidden !important;
         display: none !important;
     }
-    
-    /* Ограничиваем максимальную ширину контента и делаем компактные отступы */
     .block-container {
         max-width: 1120px !important;
         padding-top: 1rem !important;
@@ -56,14 +49,10 @@ st.markdown("""
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
     }
-
-    /* Оформление боковой панели */
     section[data-testid="stSidebar"] {
         background-color: #EFE8D8 !important;
         border-right: 1px solid #D8CBB3;
     }
-
-    /* Компактная адаптивная шапка музея */
     .museum-banner {
         background: linear-gradient(135deg, #4A151B 0%, #2C0B0E 100%);
         padding: 20px 24px;
@@ -88,8 +77,6 @@ st.markdown("""
         margin: 0 !important;
         line-height: 1.35 !important;
     }
-    
-    /* Компактные карточки статистики "Цифры памяти" */
     .stat-card {
         background-color: #FFFDF9;
         border: 1px solid #DFD3BC;
@@ -113,8 +100,6 @@ st.markdown("""
         margin-top: 3px;
         line-height: 1.2;
     }
-
-    /* Компактные заголовки и текст внутри карточек */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFDF9 !important;
         border: 1px solid #D8CBB3 !important;
@@ -133,15 +118,11 @@ st.markdown("""
         font-size: 0.94rem !important;
         line-height: 1.45 !important;
     }
-
-    /* Адаптивные вкладки */
     button[data-baseweb="tab"] {
         padding-left: 10px !important;
         padding-right: 10px !important;
         font-size: 0.9rem !important;
     }
-    
-    /* Кнопки в музейном стиле */
     .stButton > button {
         background-color: #7A1C21;
         color: #FFFFFF;
@@ -156,7 +137,6 @@ st.markdown("""
         color: #F5E1A4;
         border-color: #E5B93B;
     }
-
     @media (max-width: 768px) {
         .block-container {
             padding-left: 0.7rem !important;
@@ -175,7 +155,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- База вопросов квиза «Правнуки Победы: Бессмертие подвига» ---
 QUIZ_QUESTIONS = [
     {
         "q": "Сколько стел в честь героев-земляков установлено на Аллее Героев в Парке Победы города Ачинска?",
@@ -439,7 +418,6 @@ def fix_path(path, fallback_dir=MEDIA_DIR):
     return None
 
 def find_hero_portrait(keyword, exhibits_list):
-    """Ищет загруженный портрет Героя в базе музея по фамилии"""
     if not keyword:
         return None
     kw = keyword.lower()
@@ -457,7 +435,6 @@ if "candle_lit" not in st.session_state:
 if "show_login_box" not in st.session_state:
     st.session_state["show_login_box"] = False
 
-# Состояния для интерактивного квиза
 if "quiz_idx" not in st.session_state:
     st.session_state["quiz_idx"] = 0
 if "quiz_score" not in st.session_state:
@@ -473,7 +450,6 @@ stats = load_json(STATS_FILE, {"candles": 142, "guestbook": []})
 exhibits = load_json(DATA_FILE, [])
 album_photos = load_json(ALBUM_FILE, [])
 
-# Боковая панель
 with st.sidebar:
     st.markdown("### 🕯️ Акция «Свеча памяти»")
     st.write(f"Зажжено свечей в память о героях-земляках: **{stats['candles']}**")
@@ -508,7 +484,6 @@ with st.sidebar:
 
 is_admin = st.session_state["is_admin"]
 
-# Верхняя панель быстрых действий прямо на главном экране
 top_col1, top_col2, top_col3 = st.columns([2.2, 1.3, 1.1])
 with top_col1:
     st.caption(f"🕯️ Акция «Свеча памяти» — зажжено свечей: **{stats['candles']}**")
@@ -531,7 +506,6 @@ with top_col3:
             st.session_state["is_admin"] = False
             st.rerun()
 
-# Выпадающее окно входа
 if st.session_state["show_login_box"] and not is_admin:
     with st.container(border=True):
         st.markdown("#### 🔐 Авторизация администратора музея")
@@ -553,15 +527,29 @@ if st.session_state["show_login_box"] and not is_admin:
                 else:
                     st.error("Неверный логин или пароль!")
 
-# Компактная торжественная шапка музея
+# Компактная торжественная шапка музея с эмблемой Поискового движения (журавли и звезда)
 st.markdown("""
-<div class="museum-banner">
-    <h1>🎖️ Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги</h1>
-    <p>Цифровой архив памяти, находок полевых экспедиций и подвигов земляков • г. Ачинск, МБОУ «СШ № 11 имени Героя Советского Союза Ф.А. Колтыги»</p>
+<div class="museum-banner" style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+    <div style="flex-shrink: 0; background: rgba(255, 253, 249, 0.08); border: 2px solid #C59B27; border-radius: 50%; padding: 6px; width: 82px; height: 82px; display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 120 120" width="66" height="66" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#E5B93B" stroke-width="2.5"/>
+            <polygon points="60,12 69,36 95,36 74,51 82,76 60,61 38,76 46,51 25,36 51,36" fill="#C59B27" opacity="0.35"/>
+            <path d="M22,74 Q42,56 58,64 Q45,67 34,77 Z" fill="#FDFBF7"/>
+            <path d="M44,54 Q66,34 86,44 Q70,48 56,59 Z" fill="#FDFBF7"/>
+            <path d="M64,72 Q84,56 102,65 Q87,68 75,77 Z" fill="#E5B93B"/>
+            <path d="M52,88 Q70,74 86,82 Q73,84 62,92 Z" fill="#FDFBF7" opacity="0.85"/>
+        </svg>
+    </div>
+    <div style="flex: 1; min-width: 240px;">
+        <div style="color: #E5B93B; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.4px; font-weight: bold; margin-bottom: 4px;">
+            Поисковое движение России • Красноярский край
+        </div>
+        <h1>Виртуальный музей поискового отряда имени Героя Советского Союза Ф.А. Колтыги</h1>
+        <p>Цифровой архив памяти, находок полевых экспедиций и подвигов земляков • г. Ачинск, МБОУ «СШ № 11 имени Героя Советского Союза Ф.А. Колтыги»</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Компактное табло "Цифры памяти"
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.markdown('<div class="stat-card"><div class="stat-num">18</div><div class="stat-label">Героев Советского Союза г. Ачинск</div></div>', unsafe_allow_html=True)
@@ -716,7 +704,6 @@ def show_quiz():
     hero_img = find_hero_portrait(q_data.get("hero_keyword"), exhibits)
 
     with st.container(border=True):
-        # Если в музее загружен портрет этого Героя — показываем вопрос в две колонки с портретом
         if hero_img:
             q_col1, q_col2 = st.columns([1, 2.3])
             with q_col1:
@@ -735,7 +722,6 @@ def show_quiz():
             
             for i, opt_text in enumerate(q_data["options"]):
                 with all_cols[i]:
-                    # Варианты ответов выводятся чистым текстом без цифр-номеров
                     if st.button(opt_text, key=f"q_{curr}_opt_{i}", use_container_width=True):
                         st.session_state["quiz_answered"] = True
                         st.session_state["quiz_selected_opt"] = opt_text
@@ -899,7 +885,7 @@ with main_tabs[4]:
             "Это единственное поисковое объединение Ачинского округа, которое ведёт работу по увековечению памяти погибших защитников Отечества."
         )
         st.write(
-            "В рамках Всероссийской акции «Вахта Памяти» бойцы отряда регулярно выезжают в полевые экспедиции на места кровопролитных боёв "
+            "В рамках Всероссийской акции «Вахта Памяти» бойцы отряда регулярно выезжают в полевые экспедиции на места кровопролитных бов "
             "Великой Отечественной войны в Новгородскую область (Демянский муниципальный округ, район деревни Цемена). За время экспедиций поисковиками подняты и с воинскими почестями перезахоронены "
             "останки 97 солдат и офицеров Красной Армии, а также обнаружены 17 солдатских медальонов, позволяющих вернуть имена павшим героям."
         )
