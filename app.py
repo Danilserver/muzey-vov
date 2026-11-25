@@ -3,6 +3,8 @@ import streamlit.components.v1 as components
 import os
 import json
 import base64
+import urllib.request
+import urllib.error
 import pandas as pd
 from datetime import datetime
 
@@ -20,6 +22,9 @@ st.set_page_config(
 
 ADMIN_LOGIN = "admin"
 ADMIN_PASSWORD = "1945"
+
+GITHUB_REPO = "Danilserver/muzey-vov"
+GITHUB_BRANCH = "main"
 
 MEDIA_DIR = "museum_files"
 ALBUM_DIR = "album_files"
@@ -162,15 +167,75 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- Автоматическая синхронизация с GitHub ---
+def get_github_token():
+    try:
+        return st.secrets.get("GITHUB_TOKEN", None)
+    except Exception:
+        return None
+
+def github_push_file(local_path, repo_path, commit_msg="Автообновление архива музея"):
+    token = get_github_token()
+    if not token or not os.path.exists(local_path):
+        return False
+
+    clean_repo_path = repo_path.replace("\\", "/")
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{clean_repo_path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "MuseumApp"
+    }
+
+    sha = None
+    try:
+        req = urllib.request.Request(f"{url}?ref={GITHUB_BRANCH}", headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            res_data = json.loads(resp.read().decode("utf-8"))
+            sha = res_data.get("sha")
+    except Exception:
+        sha = None
+
+    with open(local_path, "rb") as f:
+        content_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    payload = {
+        "message": commit_msg,
+        "content": content_b64,
+        "branch": GITHUB_BRANCH
+    }
+    if sha:
+        payload["sha"] = sha
+
+    try:
+        put_req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="PUT"
+        )
+        with urllib.request.urlopen(put_req, timeout=20) as resp:
+            return resp.status in (200, 201)
+    except Exception:
+        return False
+
+def save_media_and_sync(uploaded_file, target_dir):
+    file_path = f"{target_dir}/{uploaded_file.name}"
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    github_push_file(file_path, file_path, f"Добавлен медиафайл {uploaded_file.name}")
+    return file_path
+
 def load_json(file_path, default_val):
     if os.path.exists(file_path):
         with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return default_val
 
-def save_json(file_path, data):
+def save_json(file_path, data, sync_msg="Обновление данных музея"):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    github_push_file(file_path, file_path, sync_msg)
 
 def fix_path(path, fallback_dir=MEDIA_DIR):
     if not path:
@@ -254,7 +319,7 @@ with st.sidebar:
     if not st.session_state["candle_lit"]:
         if st.button("🕯️ Зажечь свечу памяти", key="sb_candle", use_container_width=True):
             stats["candles"] += 1
-            save_json(STATS_FILE, stats)
+            save_json(STATS_FILE, stats, "Зажжена свеча памяти")
             st.session_state["candle_lit"] = True
             st.rerun()
     else:
@@ -276,6 +341,10 @@ with st.sidebar:
                     st.error("Неверный логин или пароль")
     else:
         st.success("✅ Режим администратора")
+        if get_github_token():
+            st.caption("☁️ Автосохранение на GitHub активно")
+        else:
+            st.warning("⚠️ Добавьте GITHUB_TOKEN в Secrets на Streamlit Cloud для вечного сохранения.")
         if st.button("🚪 Выйти", key="sb_logout"):
             st.session_state["is_admin"] = False
             st.rerun()
@@ -289,7 +358,7 @@ with top_col2:
     if not st.session_state["candle_lit"]:
         if st.button("🕯️ Зажечь свечу памяти", key="top_candle", use_container_width=True):
             stats["candles"] += 1
-            save_json(STATS_FILE, stats)
+            save_json(STATS_FILE, stats, "Зажжена свеча памяти")
             st.session_state["candle_lit"] = True
             st.rerun()
     else:
@@ -453,53 +522,40 @@ def show_exhibit_detail(orig_idx):
                     new_aud = st.file_uploader("Прикрепить / заменить аудиозапись (MP3, WAV)", type=["mp3", "wav"])
 
                     if st.form_submit_button("💾 Сохранить изменения"):
-                        exhibits[orig_idx]["title"] = new_title
-                        exhibits[orig_idx]["category"] = new_cat
-                        exhibits[orig_idx]["description"] = new_desc
-                        exhibits[orig_idx]["full_story"] = new_full
+                        with st.spinner("Сохраняем данные в архив..."):
+                            exhibits[orig_idx]["title"] = new_title
+                            exhibits[orig_idx]["category"] = new_cat
+                            exhibits[orig_idx]["description"] = new_desc
+                            exhibits[orig_idx]["full_story"] = new_full
 
-                        if new_img is not None:
-                            p = f"{MEDIA_DIR}/{new_img.name}"
-                            with open(p, "wb") as f:
-                                f.write(new_img.getbuffer())
-                            exhibits[orig_idx]["image"] = p
+                            if new_img is not None:
+                                exhibits[orig_idx]["image"] = save_media_and_sync(new_img, MEDIA_DIR)
 
-                        if new_extra:
-                            curr_extra = exhibits[orig_idx].get("extra_images", [])
-                            for ex_file in new_extra:
-                                p = f"{MEDIA_DIR}/{ex_file.name}"
-                                with open(p, "wb") as f:
-                                    f.write(ex_file.getbuffer())
-                                if p not in curr_extra:
-                                    curr_extra.append(p)
-                            exhibits[orig_idx]["extra_images"] = curr_extra
+                            if new_extra:
+                                curr_extra = exhibits[orig_idx].get("extra_images", [])
+                                for ex_file in new_extra:
+                                    p = save_media_and_sync(ex_file, MEDIA_DIR)
+                                    if p not in curr_extra:
+                                        curr_extra.append(p)
+                                exhibits[orig_idx]["extra_images"] = curr_extra
 
-                        if new_3d is not None:
-                            p = f"{MEDIA_DIR}/{new_3d.name}"
-                            with open(p, "wb") as f:
-                                f.write(new_3d.getbuffer())
-                            exhibits[orig_idx]["model_3d"] = p
+                            if new_3d is not None:
+                                exhibits[orig_idx]["model_3d"] = save_media_and_sync(new_3d, MEDIA_DIR)
 
-                        if new_vid is not None:
-                            p = f"{MEDIA_DIR}/{new_vid.name}"
-                            with open(p, "wb") as f:
-                                f.write(new_vid.getbuffer())
-                            exhibits[orig_idx]["video"] = p
+                            if new_vid is not None:
+                                exhibits[orig_idx]["video"] = save_media_and_sync(new_vid, MEDIA_DIR)
 
-                        if new_aud is not None:
-                            p = f"{MEDIA_DIR}/{new_aud.name}"
-                            with open(p, "wb") as f:
-                                f.write(new_aud.getbuffer())
-                            exhibits[orig_idx]["audio"] = p
+                            if new_aud is not None:
+                                exhibits[orig_idx]["audio"] = save_media_and_sync(new_aud, MEDIA_DIR)
 
-                        save_json(DATA_FILE, exhibits)
+                            save_json(DATA_FILE, exhibits, f"Обновлена карточка: {new_title}")
                         st.success("Изменения сохранены!")
                         st.rerun()
 
                 if valid_extra:
                     if st.button("🧹 Очистить все дополнительные фото", key=f"clr_ex_{orig_idx}"):
                         exhibits[orig_idx]["extra_images"] = []
-                        save_json(DATA_FILE, exhibits)
+                        save_json(DATA_FILE, exhibits, f"Очищены доп. фото: {item['title']}")
                         st.rerun()
 
 def show_museum():
@@ -564,8 +620,9 @@ def show_museum():
                     if is_admin:
                         with btn_c2:
                             if st.button("🗑️ Удалить", key=f"del_{orig_idx}", use_container_width=True):
+                                removed_title = exhibits[orig_idx].get("title", "экспонат")
                                 exhibits.pop(orig_idx)
-                                save_json(DATA_FILE, exhibits)
+                                save_json(DATA_FILE, exhibits, f"Удалена карточка: {removed_title}")
                                 st.rerun()
 
 def show_quiz():
@@ -672,17 +729,16 @@ def show_photo_album():
                     if not uploaded_photos:
                         st.error("Выберите хотя бы одну фотографию!")
                     else:
-                        for photo_file in uploaded_photos:
-                            save_p = f"{ALBUM_DIR}/{photo_file.name}"
-                            with open(save_p, "wb") as f:
-                                f.write(photo_file.getbuffer())
-                            album_photos.append({
-                                "image": save_p,
-                                "album": alb_cat,
-                                "caption": alb_caption.strip() if alb_caption.strip() else "Фотоархив поискового отряда",
-                                "date": alb_date.strip()
-                            })
-                        save_json(ALBUM_FILE, album_photos)
+                        with st.spinner("Загружаем фотографии в архив..."):
+                            for photo_file in uploaded_photos:
+                                save_p = save_media_and_sync(photo_file, ALBUM_DIR)
+                                album_photos.append({
+                                    "image": save_p,
+                                    "album": alb_cat,
+                                    "caption": alb_caption.strip() if alb_caption.strip() else "Фотоархив поискового отряда",
+                                    "date": alb_date.strip()
+                                })
+                            save_json(ALBUM_FILE, album_photos, "Обновлён фотоальбом отряда")
                         st.success(f"Загружено фотографий: {len(uploaded_photos)}!")
                         st.rerun()
 
@@ -713,7 +769,7 @@ def show_photo_album():
                             if is_admin:
                                 if st.button("🗑️ Удалить фото", key=f"del_alb_{orig_idx}", use_container_width=True):
                                     album_photos.pop(orig_idx)
-                                    save_json(ALBUM_FILE, album_photos)
+                                    save_json(ALBUM_FILE, album_photos, "Удалено фото из альбома")
                                     st.rerun()
 
 if is_admin:
@@ -808,7 +864,7 @@ with main_tabs[4]:
                     "message": g_msg.strip(),
                     "date": datetime.now().strftime("%d.%m.%Y")
                 })
-                save_json(STATS_FILE, stats)
+                save_json(STATS_FILE, stats, "Новый отзыв в книге отзывов")
                 st.success("Спасибо! Ваша запись добавлена в Книгу отзывов музея.")
                 st.rerun()
             else:
@@ -825,7 +881,7 @@ with main_tabs[4]:
                     real_idx = len(stats["guestbook"]) - 1 - idx_g
                     if st.button("🗑️ Удалить отзыв", key=f"del_gb_{real_idx}"):
                         stats["guestbook"].pop(real_idx)
-                        save_json(STATS_FILE, stats)
+                        save_json(STATS_FILE, stats, "Удалён отзыв")
                         st.rerun()
 
 if is_admin:
@@ -849,31 +905,27 @@ if is_admin:
                 if not title or not description:
                     st.error("Заполните название и основное описание!")
                 else:
-                    new_item = {
-                        "title": title,
-                        "category": category,
-                        "description": description,
-                        "full_story": full_story,
-                        "image": None,
-                        "extra_images": [],
-                        "model_3d": None,
-                        "video": None,
-                        "audio": None
-                    }
-                    for file_obj, key in [(img_file, "image"), (model_file, "model_3d"), (vid_file, "video"), (aud_file, "audio")]:
-                        if file_obj is not None:
-                            file_path = f"{MEDIA_DIR}/{file_obj.name}"
-                            with open(file_path, "wb") as f:
-                                f.write(file_obj.getbuffer())
-                            new_item[key] = file_path
-                    
-                    if extra_files:
-                        for ex_f in extra_files:
-                            ex_path = f"{MEDIA_DIR}/{ex_f.name}"
-                            with open(ex_path, "wb") as f:
-                                f.write(ex_f.getbuffer())
-                            new_item["extra_images"].append(ex_path)
-                    
-                    exhibits.append(new_item)
-                    save_json(DATA_FILE, exhibits)
+                    with st.spinner("Сохраняем новую карточку в архив..."):
+                        new_item = {
+                            "title": title,
+                            "category": category,
+                            "description": description,
+                            "full_story": full_story,
+                            "image": None,
+                            "extra_images": [],
+                            "model_3d": None,
+                            "video": None,
+                            "audio": None
+                        }
+                        for file_obj, key in [(img_file, "image"), (model_file, "model_3d"), (vid_file, "video"), (aud_file, "audio")]:
+                            if file_obj is not None:
+                                new_item[key] = save_media_and_sync(file_obj, MEDIA_DIR)
+                        
+                        if extra_files:
+                            for ex_f in extra_files:
+                                ex_path = save_media_and_sync(ex_f, MEDIA_DIR)
+                                new_item["extra_images"].append(ex_path)
+                        
+                        exhibits.append(new_item)
+                        save_json(DATA_FILE, exhibits, f"Добавлена карточка: {title}")
                     st.success(f"Запись «{title}» добавлена в раздел «{category}»!")
